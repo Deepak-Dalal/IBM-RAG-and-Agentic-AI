@@ -146,3 +146,410 @@ for prompt_type, response in responses.items():
     print(f"=== {prompt_type.upper()} RESPONSE ===")
     print(response)
     print()
+
+# Exercise 3
+# Develop one-shot prompts for these scenarios:
+
+# Create a prompt with one example of a formal email, then ask the model to write another formal email on a different topic.
+# Provide one example of converting a technical concept into a simple explanation, then ask the model to explain a different concept.
+# Give one example of extracting keywords from a sentence, then ask the model to extract keywords from a new sentence.
+
+formal_email_prompt = """
+Here is an example of a formal email requesting information:
+
+Subject: Inquiry Regarding Product Specifications for Model XYZ-100
+
+Dear Customer Support Team,
+
+I hope this email finds you well. I am writing to request detailed specifications for your product Model XYZ-100. Specifically, I am interested in learning about its dimensions, power requirements, and compatibility with third-party accessories.
+
+Could you please provide this information at your earliest convenience? Additionally, I would appreciate any available documentation or user manuals that you could share.
+
+Thank you for your assistance in this matter.
+
+Sincerely,
+John Smith
+
+---
+
+Now, please write a formal email to a university admissions office requesting information about their application deadline and required documents for the Master's program in Computer Science:
+
+"""
+
+# 2. One-shot prompt for simplifying technical concepts
+technical_concept_prompt = """
+Here is an example of explaining a technical concept in simple terms:
+
+Technical Concept: Blockchain
+Simple Explanation: A blockchain is like a digital notebook that many people have copies of. When someone writes a new entry in this notebook, everyone's copy gets updated. Once something is written, it can't be erased or changed, and everyone can see who wrote what. This makes it useful for recording important information that needs to be secure and trusted by everyone.
+
+---
+
+Now, please explain the following technical concept in simple terms:
+
+Technical Concept: Machine Learning
+Simple Explanation:
+"""
+
+# 3. One-shot prompt for keyword extraction
+keyword_extraction_prompt = """
+Here is an example of extracting keywords from a sentence:
+
+Sentence: "Cloud computing offers businesses flexibility, scalability, and cost-efficiency for their IT infrastructure needs."
+Keywords: cloud computing, flexibility, scalability, cost-efficiency, IT infrastructure
+
+---
+
+Now, please extract the main keywords from the following sentence:
+
+Sentence: "Sustainable agriculture practices focus on biodiversity, soil health, water conservation, and reducing chemical inputs."
+Keywords:
+"""
+
+responses = {}
+responses["formal_email"] = llm_model(formal_email_prompt)
+responses["technical_concept"] = llm_model(technical_concept_prompt)
+responses["keyword_extraction"] = llm_model(keyword_extraction_prompt)
+
+for prompt_type, response in responses.items():
+    print(f"=== {prompt_type.upper()} RESPONSE ===")
+    print(response)
+    print()
+
+#parameters: Set `max_new_tokens` to 10, which constrains the model to generate brief responses
+
+params = {
+    "max_new_tokens": 10,
+}
+
+prompt = """Here are few examples of classifying emotions in statements:
+
+            Statement: 'I just won my first marathon!'
+            Emotion: Joy
+            
+            Statement: 'I can't believe I lost my keys again.'
+            Emotion: Frustration
+            
+            Statement: 'My best friend is moving to another country.'
+            Emotion: Sadness
+            
+            Now, classify the emotion in the following statement:
+            Statement: 'That movie was so scary I had to cover my eyes.’
+            
+
+"""
+response = llm_model(prompt, params)
+print(f"prompt: {prompt}\n")
+print(f"response : {response}\n")
+
+
+params = {
+    "max_new_tokens": 512,
+    "temperature": 0.5,
+}
+
+prompt = """Consider the problem: 'A store had 22 apples. They sold 15 apples today and got a new delivery of 8 apples. 
+            How many apples are there now?’
+
+            Break down each step of your calculation
+
+"""
+response = llm_model(prompt, params)
+print(f"prompt: {prompt}\n")
+print(f"response : {response}\n")
+
+# Exercise 4
+# Create CoT prompts for these scenarios:
+
+# Write a prompt that asks the model to think through whether a student should study tonight or go to a movie with friends, considering their upcoming test in two days.
+# Write a prompt that instructs the model to explain the step-by-step process of making a peanut butter and jelly sandwich.
+
+# 1. Prompt for decision-making process
+decision_making_prompt = """
+Consider this situation: A student is trying to decide whether to study tonight or go to a movie with friends. They have a test in two days.
+
+Think through this decision step-by-step, considering the pros and cons of each option, and what factors might be most important in making this choice.
+"""
+
+# 2. Prompt for explaining a process
+sandwich_making_prompt = """
+Explain how to make a peanut butter and jelly sandwich.
+
+Break down each step of the process in detail, from gathering ingredients to finishing the sandwich.
+"""
+
+responses = {}
+responses["decision_making"] = llm_model(decision_making_prompt)
+responses["sandwich_making"] = llm_model(sandwich_making_prompt)
+
+for prompt_type, response in responses.items():
+    print(f"=== {prompt_type.upper()} RESPONSE ===")
+    print(response)
+    print()
+
+params = {
+    "max_new_tokens": 512,
+}
+
+prompt = """When I was 6, my sister was half of my age. Now I am 70, what age is my sister?
+
+            Provide three independent calculations and explanations, then determine the most consistent result.
+
+"""
+response = llm_model(prompt, params)
+print(f"prompt: {prompt}\n")
+print(f"response : {response}\n")
+
+model_id = "meta-llama/llama-3-405b-instruct"
+
+parameters = {
+    GenParams.MAX_NEW_TOKENS: 256,  # this controls the maximum number of tokens in the generated output
+    GenParams.TEMPERATURE: 0.5, # this randomness or creativity of the model's responses
+}
+
+url = "https://us-south.ml.cloud.ibm.com"
+project_id = "skills-network"
+
+llm = WatsonxLLM(
+        model_id=model_id,
+        url=url,
+        project_id=project_id,
+        params=parameters
+    )
+
+template = """Tell me a {adjective} joke about {content}.
+"""
+prompt = PromptTemplate.from_template(template)
+prompt.format(adjective="funny", content="chickens")
+
+from langchain_core.runnables import RunnableLambda
+
+# Define a function to ensure proper formatting
+def format_prompt(variables):
+    return prompt.format(**variables)
+
+# Create the chain with explicit formatting
+joke_chain = (
+    RunnableLambda(format_prompt)
+    | llm 
+    | StrOutputParser()
+)
+
+# Run the chain
+response = joke_chain.invoke({"adjective": "funny", "content": "chickens"})
+print(response)
+response = joke_chain.invoke({"adjective": "sad", "content": "fish"})
+print(response)
+
+content = """
+    The rapid advancement of technology in the 21st century has transformed various industries, including healthcare, education, and transportation. 
+    Innovations such as artificial intelligence, machine learning, and the Internet of Things have revolutionized how we approach everyday tasks and complex problems. 
+    For instance, AI-powered diagnostic tools are improving the accuracy and speed of medical diagnoses, while smart transportation systems are making cities more efficient and reducing traffic congestion. 
+    Moreover, online learning platforms are making education more accessible to people around the world, breaking down geographical and financial barriers. 
+    These technological developments are not only enhancing productivity but also contributing to a more interconnected and informed society.
+"""
+
+template = """Summarize the {content} in one sentence.
+"""
+prompt = PromptTemplate.from_template(template)
+
+# Create the LCEL chain
+summarize_chain = (
+    RunnableLambda(format_prompt)
+    | llm 
+    | StrOutputParser()
+)
+
+# Run the chain
+summary = summarize_chain.invoke({"content": content})
+print(summary)
+
+content = """
+    The solar system consists of the Sun, eight planets, their moons, dwarf planets, and smaller objects like asteroids and comets. 
+    The inner planets—Mercury, Venus, Earth, and Mars—are rocky and solid. 
+    The outer planets—Jupiter, Saturn, Uranus, and Neptune—are much larger and gaseous.
+"""
+
+question = "Which planets in the solar system are rocky and solid?"
+
+template = """
+    Answer the {question} based on the {content}.
+    Respond "Unsure about answer" if not sure about the answer.
+    
+    Answer:
+    
+"""
+prompt = PromptTemplate.from_template(template)
+
+# Create the LCEL chain
+qa_chain = (
+    RunnableLambda(format_prompt)
+    | llm 
+    | StrOutputParser()
+)
+
+# Run the chain
+answer = qa_chain.invoke({"question": question, "content": content})
+print(answer)
+
+text = """
+    The concert last night was an exhilarating experience with outstanding performances by all artists.
+"""
+
+categories = "Entertainment, Food and Dining, Technology, Literature, Music."
+
+template = """
+    Classify the {text} into one of the {categories}.
+    
+    Category:
+    
+"""
+prompt = PromptTemplate.from_template(template)
+
+# Create the LCEL chain
+classification_chain = (
+    RunnableLambda(format_prompt)
+    | llm 
+    | StrOutputParser()
+)
+
+# Run the chain
+category = classification_chain.invoke({"text": text, "categories": categories})
+print(category)
+
+description = """
+    Retrieve the names and email addresses of all customers from the 'customers' table who have made a purchase in the last 30 days. 
+    The table 'purchases' contains a column 'purchase_date'
+"""
+
+template = """
+    Generate an SQL query based on the {description}
+    
+    SQL Query:
+    
+"""
+prompt = PromptTemplate.from_template(template)
+
+# Create the LCEL chain
+sql_generation_chain = (
+    RunnableLambda(format_prompt) 
+    | llm 
+    | StrOutputParser()
+)
+
+# Run the chain
+sql_query = sql_generation_chain.invoke({"description": description})
+print(sql_query)
+
+role = """
+    Dungeon & Dragons game master
+"""
+
+tone = "engaging and immersive"
+
+template = """
+    You are an expert {role}. I have this question {question}. I would like our conversation to be {tone}.
+    
+    Answer:
+    
+"""
+prompt = PromptTemplate.from_template(template)
+
+# Create the LCEL chain
+roleplay_chain = (
+    RunnableLambda(format_prompt)
+    | llm 
+    | StrOutputParser()
+)
+
+# Create an interactive chat loop
+while True:
+    query = input("Question: ")
+    
+    if query.lower() in ["quit", "exit", "bye"]:
+        print("Answer: Goodbye!")
+        break
+        
+    response = roleplay_chain.invoke({"role": role, "question": query, "tone": tone})
+    print("Answer: ", response)
+
+
+# Exercise 5
+# Create an LCEL Chain with Custom Formatting
+
+# In this exercise, you'll create your own LCEL chain that uses prompt templates to build a custom application.
+
+# Task: Create a product review analyzer that can:
+
+# Identify the sentiment (positive, negative, or neutral).
+# Extract mentioned product features.
+# Provide a one-sentence summary of the review.
+# Steps:
+
+# Create a prompt template with placeholders for the review text.
+# Build an LCEL chain that formats your prompt properly.
+# Process the sample reviews and display the results.
+# Try modifying the chain to change the output format.
+# Sample input:
+
+# reviews = [
+#     "I love this smartphone! The camera quality is exceptional and the battery lasts all day. The only downside is that it heats up a bit during gaming.",
+#     "This laptop is terrible. It's slow, crashes frequently, and the keyboard stopped working after just two months. Customer service was unhelpful."
+# ]
+
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnableLambda
+from langchain_core.output_parsers import StrOutputParser
+
+model_id = "meta-llama/llama-3-3-70b-instruct"
+
+parameters = {
+    GenParams.MAX_NEW_TOKENS: 512,  # this controls the maximum number of tokens in the generated output
+    GenParams.TEMPERATURE: 0.2, # this randomness or creativity of the model's responses
+}
+
+url = "https://us-south.ml.cloud.ibm.com"
+project_id = "skills-network"
+
+llm = WatsonxLLM(
+        model_id=model_id,
+        url=url,
+        project_id=project_id,
+        params=parameters
+    )
+
+# Create the prompt template
+template = """
+Analyze the following product review:
+"{review}"
+
+Provide your analysis in the following format:
+- Sentiment: (positive, negative, or neutral)
+- Key Features Mentioned: (list the product features mentioned)
+- Summary: (one-sentence summary)
+"""
+
+product_review_prompt = PromptTemplate.from_template(template)
+
+# Create a formatting function
+def format_review_prompt(variables):
+    return product_review_prompt.format(**variables)
+
+# Build the LCEL chain
+review_analysis_chain = (
+    RunnableLambda(format_review_prompt)
+    | llm 
+    | StrOutputParser()
+)
+
+# Process the reviews
+reviews = [
+    "I love this smartphone! The camera quality is exceptional and the battery lasts all day. The only downside is that it heats up a bit during gaming.",
+    "This laptop is terrible. It's slow, crashes frequently, and the keyboard stopped working after just two months. Customer service was unhelpful."
+]
+
+for i, review in enumerate(reviews):
+    print(f"==== Review #{i+1} ====")
+    result = review_analysis_chain.invoke({"review": review})
+    print(result)
+    print()
