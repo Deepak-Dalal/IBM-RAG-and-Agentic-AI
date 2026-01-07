@@ -449,3 +449,4 @@ web_data = loader.load()
 # .page_content accesses the text content of that Document
 # [:1000] slices the string to get only the first 1000 characters
 print(web_data[0].page_content[:1000])
+
