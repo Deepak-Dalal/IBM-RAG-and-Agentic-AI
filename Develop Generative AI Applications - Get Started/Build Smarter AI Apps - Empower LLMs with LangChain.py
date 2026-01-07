@@ -450,3 +450,309 @@ web_data = loader.load()
 # [:1000] slices the string to get only the first 1000 characters
 print(web_data[0].page_content[:1000])
 
+# Import the CharacterTextSplitter class from langchain.text_splitter module
+# Text splitters are used to divide large texts into smaller, manageable chunks
+from langchain.text_splitter import CharacterTextSplitter
+
+# Create a CharacterTextSplitter with specific configuration:
+# - chunk_size=200: Each chunk will contain approximately 200 characters
+# - chunk_overlap=20: Consecutive chunks will overlap by 20 characters to maintain context
+# - separator="\n": Text will be split at newline characters when possible
+text_splitter = CharacterTextSplitter(chunk_size=200, chunk_overlap=20, separator="\n")
+
+# Split the previously loaded document (PDF or other text) into chunks
+# The split_documents method:
+# 1. Takes a list of Document objects
+# 2. Splits each document's content based on the configured parameters
+# 3. Returns a new list of Document objects where each contains a chunk of text
+# 4. Preserves the original metadata for each chunk
+chunks = text_splitter.split_documents(document)
+
+# Print the total number of chunks created
+# This shows how many smaller Document objects were generated from the original document(s)
+# The number depends on the original document length and the chunk_size setting
+print(len(chunks))
+
+chunks[5].page_content   # take a look at any chunk's page content
+
+from langchain_core.documents import Document
+from langchain_community.document_loaders import PyPDFLoader, WebBaseLoader
+from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
+
+# Load the LangChain paper
+paper_url = "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/96-FDF8f7coh0ooim7NyEQ/langchain-paper.pdf"
+pdf_loader = PyPDFLoader(paper_url)
+pdf_document = pdf_loader.load()
+
+# Load content from LangChain website
+web_url = "https://python.langchain.com/v0.2/docs/introduction/"
+web_loader = WebBaseLoader(web_url)
+web_document = web_loader.load()
+
+# Create two different text splitters
+splitter_1 = CharacterTextSplitter(chunk_size=300, chunk_overlap=30, separator="\n")
+splitter_2 = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50, separators=["\n\n", "\n", ". ", " ", ""])
+
+# Apply both splitters to the PDF document
+chunks_1 = splitter_1.split_documents(pdf_document)
+chunks_2 = splitter_2.split_documents(pdf_document)
+
+# Define a function to display document statistics
+def display_document_stats(docs, name):
+    """Display statistics about a list of document chunks"""
+    total_chunks = len(docs)
+    total_chars = sum(len(doc.page_content) for doc in docs)
+    avg_chunk_size = total_chars / total_chunks if total_chunks > 0 else 0
+    
+    # Count unique metadata keys across all documents
+    all_metadata_keys = set()
+    for doc in docs:
+        all_metadata_keys.update(doc.metadata.keys())
+    
+    # Print the statistics
+    print(f"\n=== {name} Statistics ===")
+    print(f"Total number of chunks: {total_chunks}")
+    print(f"Average chunk size: {avg_chunk_size:.2f} characters")
+    print(f"Metadata keys preserved: {', '.join(all_metadata_keys)}")
+    
+    if docs:
+        print("\nExample chunk:")
+        example_doc = docs[min(5, total_chunks-1)]  # Get the 5th chunk or the last one if fewer
+        print(f"Content (first 150 chars): {example_doc.page_content[:150]}...")
+        print(f"Metadata: {example_doc.metadata}")
+        
+        # Calculate length distribution
+        lengths = [len(doc.page_content) for doc in docs]
+        min_len = min(lengths)
+        max_len = max(lengths)
+        print(f"Min chunk size: {min_len} characters")
+        print(f"Max chunk size: {max_len} characters")
+
+# Display stats for both chunk sets
+display_document_stats(chunks_1, "Splitter 1")
+display_document_stats(chunks_2, "Splitter 2")
+
+# Import the EmbedTextParamsMetaNames class from ibm_watsonx_ai.metanames module
+# This class provides constants for configuring Watson embedding parameters
+from ibm_watsonx_ai.metanames import EmbedTextParamsMetaNames
+
+# Configure embedding parameters using a dictionary:
+# - TRUNCATE_INPUT_TOKENS: Limit the input to 3 tokens (very short, possibly for testing)
+# - RETURN_OPTIONS: Request that the original input text be returned along with embeddings
+embed_params = {
+ EmbedTextParamsMetaNames.TRUNCATE_INPUT_TOKENS: 3,
+ EmbedTextParamsMetaNames.RETURN_OPTIONS: {"input_text": True},
+}
+
+# Import the WatsonxEmbeddings class from langchain_ibm module
+# This provides an integration between LangChain and IBM's Watson AI services
+from langchain_ibm import WatsonxEmbeddings
+
+# Create a WatsonxEmbeddings instance with the following configuration:
+# - model_id: Specifies the "slate-125m-english-rtrvr-v2" embedding model from IBM
+# - url: The endpoint URL for the Watson service in the US South region
+# - project_id: The Watson project ID to use ("skills-network")
+# - params: The embedding parameters configured earlier
+watsonx_embedding = WatsonxEmbeddings(
+    model_id="ibm/slate-125m-english-rtrvr-v2",
+    url="https://us-south.ml.cloud.ibm.com",
+    project_id="skills-network",
+    params=embed_params,
+)
+
+texts = [text.page_content for text in chunks]
+
+embedding_result = watsonx_embedding.embed_documents(texts)
+embedding_result[0][:5]
+
+from langchain.vectorstores import Chroma
+
+docsearch = Chroma.from_documents(chunks, watsonx_embedding)
+
+query = "Langchain"
+docs = docsearch.similarity_search(query)
+print(docs[0].page_content)
+
+# Use the docsearch vector store as a retriever
+# This converts the vector store into a retriever interface that can fetch relevant documents
+retriever = docsearch.as_retriever()
+
+# Invoke the retriever with the query "Langchain"
+# This will:
+# 1. Convert the query text "Langchain" into an embedding vector
+# 2. Perform a similarity search in the vector store using this embedding
+# 3. Return the most semantically similar documents to the query
+docs = retriever.invoke("Langchain")
+
+# Access the first (most relevant) document from the retrieval results
+# This returns the full Document object including:
+# - page_content: The text content of the document
+# - metadata: Any associated metadata like source, page numbers, etc.
+# The returned document is the one most semantically similar to "Langchain"
+docs[0]
+
+from langchain.retrievers import ParentDocumentRetriever
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain.storage import InMemoryStore
+
+# Set up two different text splitters for a hierarchical splitting approach:
+
+# 1. Parent splitter creates larger chunks (2000 characters)
+# This is used to split documents into larger, more contextually complete sections
+parent_splitter = CharacterTextSplitter(chunk_size=2000, chunk_overlap=20, separator='\n')
+
+# 2. Child splitter creates smaller chunks (400 characters)
+# This is used to split the parent chunks into smaller pieces for more precise retrieval
+child_splitter = CharacterTextSplitter(chunk_size=400, chunk_overlap=20, separator='\n')
+
+# Create a Chroma vector store with:
+# - A specific collection name "split_parents" for organization
+# - The previously configured Watson embeddings function
+vectorstore = Chroma(
+    collection_name="split_parents", embedding_function=watsonx_embedding
+)
+
+# Set up an in-memory storage layer for the parent documents
+# This will store the larger chunks that provide context, but won't be directly embedded
+store = InMemoryStore()
+
+# Create a ParentDocumentRetriever instance that implements hierarchical document retrieval
+retriever = ParentDocumentRetriever(
+    # The vector store where child document embeddings will be stored and searched
+    # This Chroma instance will contain the embeddings for the smaller chunks
+    vectorstore=vectorstore,
+    
+    # The document store where parent documents will be stored
+    # These larger chunks won't be embedded but will be retrieved by ID when needed
+    docstore=store,
+    
+    # The splitter used to create small chunks (400 chars) for precise vector search
+    # These smaller chunks are embedded and used for similarity matching
+    child_splitter=child_splitter,
+    
+    # The splitter used to create larger chunks (2000 chars) for better context
+    # These parent chunks provide more complete information when retrieved
+    parent_splitter=parent_splitter,
+)
+
+retriever.add_documents(document)
+
+len(list(store.yield_keys()))
+
+sub_docs = vectorstore.similarity_search("Langchain")
+
+print(sub_docs[0].page_content)
+
+retrieved_docs = retriever.invoke("Langchain")
+
+print(retrieved_docs[0].page_content)
+
+from langchain.chains import RetrievalQA
+
+# Create a RetrievalQA chain by configuring:
+qa = RetrievalQA.from_chain_type(
+    # The language model to use for generating answers
+    llm=llama_llm,
+    
+    # The chain type "stuff" means all retrieved documents are simply concatenated and passed to the LLM
+    chain_type="stuff",
+    
+    # The retriever component that will fetch relevant documents
+    # docsearch.as_retriever() converts the vector store into a retriever interface
+    retriever=docsearch.as_retriever(),
+    
+    # Whether to include the source documents in the response
+    # Set to False to return only the generated answer
+    return_source_documents=False
+)
+
+# Define a query to test the QA system
+# This question asks about the main topic of the paper
+query = "what is this paper discussing?"
+
+# Execute the QA chain with the query
+# This will:
+# 1. Send the query to the retriever to get relevant documents
+# 2. Combine those documents using the "stuff" method
+# 3. Send the query and combined documents to the Llama LLM
+# 4. Return the generated answer (without source documents)
+qa.invoke(query)
+
+# Exercise 4
+# Building a Simple Retrieval System with LangChain
+# In this exercise, you'll implement a simple retrieval system using LangChain's vector store and retriever components to help answer questions based on a document.
+
+# Instructions:
+
+# Import the necessary components for document loading, embedding, and retrieval.
+# Load the provided document about artificial intelligence.
+# Split the document into manageable chunks.
+# Use an embedding model to create vector representations.
+# Create a vector store and a retriever.
+# Implement a simple question-answering system.
+# Test your system with at least 3 different questions.
+
+from langchain_core.documents import Document
+from langchain_community.document_loaders import WebBaseLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.vectorstores import Chroma
+from langchain_ibm import WatsonxEmbeddings
+from ibm_watsonx_ai.metanames import EmbedTextParamsMetaNames
+from langchain.chains import RetrievalQA
+from ibm_watsonx_ai.foundation_models import ModelInference
+from ibm_watsonx_ai.metanames import GenTextParamsMetaNames as GenParams
+from ibm_watsonx_ai.foundation_models.utils.enums import ModelTypes
+from ibm_watson_machine_learning.foundation_models.extensions.langchain import WatsonxLLM
+
+# 1. Load a document about AI
+loader = WebBaseLoader("https://python.langchain.com/v0.2/docs/introduction/")
+documents = loader.load()
+
+# 2. Split the document into chunks
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+chunks = text_splitter.split_documents(documents)
+
+# 3. Set up the embedding model
+embed_params = {
+    EmbedTextParamsMetaNames.TRUNCATE_INPUT_TOKENS: 3,
+    EmbedTextParamsMetaNames.RETURN_OPTIONS: {"input_text": True},
+}
+
+embedding_model = WatsonxEmbeddings(
+    model_id="ibm/slate-125m-english-rtrvr-v2",
+    url="https://us-south.ml.cloud.ibm.com",
+    project_id="skills-network",
+    params=embed_params,
+)
+
+# 4. Create a vector store
+vector_store = Chroma.from_documents(chunks, embedding_model)
+
+# 5. Create a retriever
+retriever = vector_store.as_retriever(search_kwargs={"k": 3})
+
+# 6. Define a function to search for relevant information
+def search_documents(query, top_k=3):
+    """Search for documents relevant to a query"""
+    # Use the retriever to get relevant documents
+    docs = retriever.get_relevant_documents(query)
+    
+    # Limit to top_k if specified
+    return docs[:top_k]
+
+# 7. Test with a few queries
+test_queries = [
+    "What is LangChain?",
+    "How do retrievers work?",
+    "Why is document splitting important?"
+]
+
+for query in test_queries:
+    print(f"\nQuery: {query}")
+    results = search_documents(query)
+    
+    # Print the results
+    print(f"Found {len(results)} relevant documents:")
+    for i, doc in enumerate(results):
+        print(f"\nResult {i+1}: {doc.page_content[:150]}...")
+        print(f"Source: {doc.metadata.get('source', 'Unknown')}")
