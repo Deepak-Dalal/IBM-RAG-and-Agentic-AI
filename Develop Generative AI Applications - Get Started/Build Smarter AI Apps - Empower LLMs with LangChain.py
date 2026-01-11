@@ -756,3 +756,730 @@ for query in test_queries:
     for i, doc in enumerate(results):
         print(f"\nResult {i+1}: {doc.page_content[:150]}...")
         print(f"Source: {doc.metadata.get('source', 'Unknown')}")
+
+# Import the ChatMessageHistory class from langchain.memory
+from langchain.memory import ChatMessageHistory
+
+# Set up the language model to use for chat interactions
+chat = llama_llm
+
+# Create a new conversation history object
+# This will store the back-and-forth messages in the conversation
+history = ChatMessageHistory()
+
+# Add an initial greeting message from the AI to the history
+# This represents a message that would have been sent by the AI assistant
+history.add_ai_message("hi!")
+
+# Add a user's question to the conversation history
+# This represents a message sent by the user
+history.add_user_message("what is the capital of France?")
+
+history.messages
+
+ai_response = chat.invoke(history.messages)
+ai_response
+
+history.add_ai_message(ai_response)
+history.messages
+
+# Import ConversationBufferMemory from langchain.memory module
+from langchain.memory import ConversationBufferMemory
+
+# Import ConversationChain from langchain.chains module
+from langchain.chains import ConversationChain
+
+# Create a conversation chain with the following components:
+conversation = ConversationChain(
+    # The language model to use for generating responses
+    llm=llama_llm,
+    
+    # Set verbose to True to see the full prompt sent to the LLM, including memory contents
+    verbose=True,
+    
+    # Initialize with ConversationBufferMemory that will:
+    # - Store all conversation turns (user inputs and AI responses)
+    # - Append the entire conversation history to each new prompt
+    # - Provide context for the LLM to generate contextually relevant responses
+    memory=ConversationBufferMemory()
+)
+
+conversation.invoke(input="Hello, I am a little cat. Who are you?")
+
+conversation.invoke(input="What can you do?")
+
+conversation.invoke(input="Who am I?.")
+
+# Exercise 5
+# Building a Chatbot with Memory using LangChain
+# In this exercise, you'll create a simple chatbot that can remember previous interactions using LangChain's memory components. You'll implement conversation memory to make your chatbot maintain context throughout a conversation.
+
+# Instructions:
+
+# Import the necessary components for chat history and conversation memory.
+# Set up a language model for your chatbot.
+# Create a conversation chain with memory capabilities.
+# Implement a simple interactive chat interface.
+# Test the memory capabilities with a series of related questions.
+# Examine how the conversation history is stored and accessed. Starter code: provide your solution in the TODO parts
+
+from langchain.memory import ConversationBufferMemory, ChatMessageHistory
+from langchain.chains import ConversationChain
+from langchain_core.messages import HumanMessage, AIMessage
+from ibm_watsonx_ai.foundation_models import ModelInference
+from ibm_watsonx_ai.metanames import GenTextParamsMetaNames as GenParams
+from ibm_watson_machine_learning.foundation_models.extensions.langchain import WatsonxLLM
+
+# 1. Set up the language model
+model_id = 'meta-llama/llama-4-maverick-17b-128e-instruct-fp8'
+parameters = {
+    GenParams.MAX_NEW_TOKENS: 256,
+    GenParams.TEMPERATURE: 0.2,
+}
+credentials = {"url": "https://us-south.ml.cloud.ibm.com"}
+project_id = "skills-network"
+
+# Initialize the model
+model = ModelInference(
+    model_id=model_id,
+    params=parameters,
+    credentials=credentials,
+    project_id=project_id
+)
+llm = WatsonxLLM(model=model)
+
+# 2. Create a simple conversation with chat history
+history = ChatMessageHistory()
+
+# Add some initial messages
+history.add_user_message("Hello, my name is Alice.")
+history.add_ai_message("Hello Alice! It's nice to meet you. How can I help you today?")
+
+# 3. Print the current conversation history
+print("Initial Chat History:")
+for message in history.messages:
+    sender = "Human" if isinstance(message, HumanMessage) else "AI"
+    print(f"{sender}: {message.content}")
+
+# 4. Set up a conversation chain with memory
+memory = ConversationBufferMemory(chat_memory=history)
+conversation = ConversationChain(
+    llm=llm,
+    memory=memory,
+    verbose=True
+)
+
+# 5. Function to simulate a conversation
+def chat_simulation(conversation, inputs):
+    """Run a series of inputs through the conversation chain and display responses"""
+    print("\n=== Beginning Chat Simulation ===")
+    
+    for i, user_input in enumerate(inputs):
+        print(f"\n--- Turn {i+1} ---")
+        print(f"Human: {user_input}")
+        
+        # Get response from the conversation chain
+        response = conversation.invoke(input=user_input)
+        
+        # Print the AI's response
+        print(f"AI: {response['response']}")
+    
+    print("\n=== End of Chat Simulation ===")
+
+# 6. Test with a series of related questions
+test_inputs = [
+    "My favorite color is blue.",
+    "I enjoy hiking in the mountains.",
+    "What activities would you recommend for me?",
+    "What was my favorite color again?",
+    "Can you remember both my name and my favorite color?"
+]
+
+chat_simulation(conversation, test_inputs)
+
+# 7. Examine the conversation memory
+print("\nFinal Memory Contents:")
+print(conversation.memory.buffer)
+
+# 8. Create a new conversation with a different type of memory (optional)
+from langchain.memory import ConversationSummaryMemory
+
+# Create a summarizing memory that will compress the conversation
+summary_memory = ConversationSummaryMemory(llm=llm)
+# Save the initial context to the summary memory
+summary_memory.save_context(
+    {"input": "Hello, my name is Alice."}, 
+    {"output": "Hello Alice! It's nice to meet you. How can I help you today?"}
+)
+summary_conversation = ConversationChain(
+   llm=llm,
+   memory=summary_memory,
+   verbose=True
+)
+
+print("\\\\\\n\\n=== Testing Conversation Summary Memory ===")
+# Let's use the same inputs for comparison
+chat_simulation(summary_conversation, test_inputs)
+
+print("\\nFinal Summary Memory Contents:")
+print(summary_memory.buffer)
+
+# 9. Compare the two memory types
+print("\n=== Memory Comparison ===")
+print(f"Buffer Memory Size: {len(conversation.memory.buffer)} characters")
+print(f"Summary Memory Size: {len(summary_memory.buffer)} characters")
+print("\nThe conversation summary memory typically creates a more compact representation of the chat history.")
+
+
+
+
+# Import PromptTemplate from langchain_core.prompts
+# This is the new import path in LangChain's modular structure
+from langchain_core.prompts import PromptTemplate
+
+# Import StrOutputParser from langchain_core.output_parsers
+from langchain_core.output_parsers import StrOutputParser
+
+template = """Your job is to come up with a classic dish from the area that the users suggests.
+{location}
+ YOUR RESPONSE:
+"""
+
+# Create a prompt template using the from_template method
+prompt = PromptTemplate.from_template(template)
+
+# Create a chain using LangChain Expression Language (LCEL) with the pipe operator
+# This creates a processing pipeline that:
+# 1. Formats the prompt with the input values
+# 2. Sends the formatted prompt to the Llama LLM
+# 3. Parses the output to extract just the string response
+location_chain_lcel = prompt | llama_llm | StrOutputParser()
+
+# Invoke the chain with 'China' as the location
+result = location_chain_lcel.invoke({"location": "China"})
+
+# Print the result (the recommended classic dish from China)
+print(result)
+
+
+
+# Import PromptTemplate from langchain_core.prompts
+# This is the new import path in LangChain's modular structure
+from langchain_core.prompts import PromptTemplate
+
+# Import StrOutputParser from langchain_core.output_parsers
+from langchain_core.output_parsers import StrOutputParser
+
+template = """Your job is to come up with a classic dish from the area that the users suggests.
+{location}
+ YOUR RESPONSE:
+"""
+
+# Create a prompt template using the from_template method
+prompt = PromptTemplate.from_template(template)
+
+# Create a chain using LangChain Expression Language (LCEL) with the pipe operator
+# This creates a processing pipeline that:
+# 1. Formats the prompt with the input values
+# 2. Sends the formatted prompt to the Llama LLM
+# 3. Parses the output to extract just the string response
+location_chain_lcel = prompt | llama_llm | StrOutputParser()
+
+# Invoke the chain with 'China' as the location
+result = location_chain_lcel.invoke({"location": "China"})
+
+# Print the result (the recommended classic dish from China)
+print(result)
+
+
+
+# Import SequentialChain from langchain.chains module
+from langchain.chains import SequentialChain
+
+# Create a template for generating a recipe based on a meal
+template = """Given a meal {meal}, give a short and simple recipe on how to make that dish at home.
+ YOUR RESPONSE:
+"""
+
+# Create a PromptTemplate with 'meal' as the input variable
+prompt_template = PromptTemplate(template=template, input_variables=['meal'])
+
+# Create an LLMChain (chain 2) for generating recipes
+# The output_key='recipe' defines how this chain's output will be referenced in later chains
+dish_chain = LLMChain(llm=llama_llm, prompt=prompt_template, output_key='recipe')
+
+# Create a template for estimating cooking time based on a recipe
+# This template asks the LLM to analyze a recipe and estimate preparation time
+template = """Given the recipe {recipe}, estimate how much time I need to cook it.
+ YOUR RESPONSE:
+"""
+
+# Create a PromptTemplate with 'recipe' as the input variable
+prompt_template = PromptTemplate(template=template, input_variables=['recipe'])
+
+# Create an LLMChain (chain 3) for estimating cooking time
+# The output_key='time' defines the key for this chain's output in the final result
+recipe_chain = LLMChain(llm=llama_llm, prompt=prompt_template, output_key='time')
+
+# Create a SequentialChain that combines all three chains:
+# 1. location_chain (from earlier code): Takes a location and suggests a dish
+# 2. dish_chain: Takes the suggested dish and provides a recipe
+# 3. recipe_chain: Takes the recipe and estimates cooking time
+overall_chain = SequentialChain(
+    # List of chains to execute in sequence
+    chains=[location_chain, dish_chain, recipe_chain],
+    
+    # The input variables required to start the chain sequence
+    # Only 'location' is needed to begin the process
+    input_variables=['location'],
+    
+    # The output variables to include in the final result
+    # This makes the output of each chain available in the final result
+    output_variables=['meal', 'recipe', 'time'],
+    
+    # Whether to print detailed information about each step
+    verbose=True
+)
+
+from pprint import pprint
+pprint(overall_chain.invoke(input={'location':'China'}))
+
+
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+
+# Define the templates for each step
+location_template = """Your job is to come up with a classic dish from the area that the users suggests.
+{location}
+
+YOUR RESPONSE:
+"""
+
+dish_template = """Given a meal {meal}, give a short and simple recipe on how to make that dish at home.
+
+YOUR RESPONSE:
+"""
+
+time_template = """Given the recipe {recipe}, estimate how much time I need to cook it.
+
+YOUR RESPONSE:
+"""
+
+# Create the location chain using LCEL (LangChain Expression Language)
+# This chain takes a location and returns a classic dish from that region
+location_chain_lcel = (
+    PromptTemplate.from_template(location_template)  # Format the prompt with location
+    | llama_llm                                    # Send to the LLM
+    | StrOutputParser()                              # Extract the string response
+)
+
+# Create the dish chain using LCEL
+# This chain takes a meal name and returns a recipe
+dish_chain_lcel = (
+    PromptTemplate.from_template(dish_template)      # Format the prompt with meal
+    | llama_llm                                    # Send to the LLM
+    | StrOutputParser()                              # Extract the string response
+)
+
+# Create the time estimation chain using LCEL
+# This chain takes a recipe and returns an estimated cooking time
+time_chain_lcel = (
+    PromptTemplate.from_template(time_template)      # Format the prompt with recipe
+    | llama_llm                                    # Send to the LLM
+    | StrOutputParser()                              # Extract the string response
+)
+
+# Combine all chains into a single workflow using RunnablePassthrough.assign
+# RunnablePassthrough.assign adds new keys to the input dictionary without removing existing ones
+overall_chain_lcel = (
+    # Step 1: Generate a meal based on location and add it to the input dictionary
+    RunnablePassthrough.assign(meal=lambda x: location_chain_lcel.invoke({"location": x["location"]}))
+    # Step 2: Generate a recipe based on the meal and add it to the input dictionary
+    | RunnablePassthrough.assign(recipe=lambda x: dish_chain_lcel.invoke({"meal": x["meal"]}))
+    # Step 3: Estimate cooking time based on the recipe and add it to the input dictionary
+    | RunnablePassthrough.assign(time=lambda x: time_chain_lcel.invoke({"recipe": x["recipe"]}))
+)
+# Run the chain
+result = overall_chain_lcel.invoke({"location": "China"})
+pprint(result)
+
+# Exercise 6
+# Implementing Multi-Step Processing with Different Chain Approaches
+# In this exercise, you'll create a multi-step information processing system using both traditional chains and the modern LCEL approach. You'll build a system that analyzes product reviews, extracts key information, and generates responses based on the analysis.
+
+# Instructions:
+
+# Import the necessary components for both traditional chains and LCEL.
+# Implement a three-step process using both traditional SequentialChain and modern LCEL approaches.
+# Create templates for sentiment analysis, summarization, and response generation.
+# Test your implementations with sample product reviews.
+# Compare the flexibility and readability of both approaches.
+# Document the advantages and disadvantages of each method.
+
+from langchain.chains import LLMChain, SequentialChain
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+
+# Sample product reviews for testing
+positive_review = """I absolutely love this coffee maker! It brews quickly and the coffee tastes amazing. 
+The built-in grinder saves me so much time in the morning, and the programmable timer means 
+I wake up to fresh coffee every day. Worth every penny and highly recommended to any coffee enthusiast."""
+
+negative_review = """Disappointed with this laptop. It's constantly overheating after just 30 minutes of use, 
+and the battery life is nowhere near the 8 hours advertised - I barely get 3 hours. 
+The keyboard has already started sticking on several keys after just two weeks. Would not recommend to anyone."""
+
+# Step 1: Define the prompt templates for each processing step
+sentiment_template = """Analyze the sentiment of the following product review as positive, negative, or neutral.
+Provide your analysis in the format: "SENTIMENT: [positive/negative/neutral]"
+
+Review: {review}
+
+Your analysis:
+"""
+
+summary_template = """Summarize the following product review into 3-5 key bullet points.
+Each bullet point should be concise and capture an important aspect mentioned in the review.
+
+Review: {review}
+Sentiment: {sentiment}
+
+Key points:
+"""
+
+response_template = """Write a helpful response to a customer based on their product review.
+If the sentiment is positive, thank them for their feedback. If negative, express understanding 
+and suggest a solution or next steps. Personalize based on the specific points they mentioned.
+
+Review: {review}
+Sentiment: {sentiment}
+Key points: {summary}
+
+Response to customer:
+"""
+
+# Create prompt templates for each step
+sentiment_prompt = PromptTemplate.from_template(sentiment_template)
+summary_prompt = PromptTemplate.from_template(summary_template)
+response_prompt = PromptTemplate.from_template(response_template)
+
+
+# PART 1: Traditional Chain Approach
+# Create individual LLMChains for each step
+sentiment_chain = LLMChain(
+    llm=llama_llm, 
+    prompt=sentiment_prompt, 
+    output_key="sentiment"
+)
+
+summary_chain = LLMChain(
+    llm=llama_llm, 
+    prompt=summary_prompt, 
+    output_key="summary"
+)
+
+response_chain = LLMChain(
+    llm=llama_llm, 
+    prompt=response_prompt, 
+    output_key="response"
+)
+
+# Create a SequentialChain to connect all steps
+traditional_chain = SequentialChain(
+    chains=[sentiment_chain, summary_chain, response_chain],
+    input_variables=["review"],
+    output_variables=["sentiment", "summary", "response"],
+    verbose=True
+)
+
+
+# PART 2: LCEL Approach
+# Create individual chain components using the pipe operator (|)
+sentiment_chain_lcel = sentiment_prompt | llama_llm | StrOutputParser()
+summary_chain_lcel = summary_prompt | llama_llm | StrOutputParser()
+response_chain_lcel = response_prompt | llama_llm | StrOutputParser()
+
+# Connect the components using RunnablePassthrough.assign()
+lcel_chain = (
+    RunnablePassthrough.assign(
+        sentiment=lambda x: sentiment_chain_lcel.invoke({"review": x["review"]})
+    )
+    | RunnablePassthrough.assign(
+        summary=lambda x: summary_chain_lcel.invoke({
+            "review": x["review"], 
+            "sentiment": x["sentiment"]
+        })
+    )
+    | RunnablePassthrough.assign(
+        response=lambda x: response_chain_lcel.invoke({
+            "review": x["review"], 
+            "sentiment": x["sentiment"], 
+            "summary": x["summary"]
+        })
+    )
+)
+
+
+# Test both implementations
+def test_chains(review):
+    """Test both chain implementations with the given review"""
+    print("\n" + "="*50)
+    print(f"TESTING WITH REVIEW:\n{review[:100]}...\n")
+    
+    print("TRADITIONAL CHAIN RESULTS:")
+    traditional_results = traditional_chain.invoke({"review": review})
+    print(f"Sentiment: {traditional_results['sentiment']}")
+    print(f"Summary: {traditional_results['summary']}")
+    print(f"Response: {traditional_results['response']}")
+    
+    print("\nLCEL CHAIN RESULTS:")
+    lcel_results = lcel_chain.invoke({"review": review})
+    print(f"Sentiment: {lcel_results['sentiment']}")
+    print(f"Summary: {lcel_results['summary']}")
+    print(f"Response: {lcel_results['response']}")
+    
+    print("="*50)
+
+# Run tests
+test_chains(positive_review)
+test_chains(negative_review)
+
+from langchain_core.tools import Tool
+from langchain.tools import tool
+from langchain_experimental.utilities import PythonREPL
+
+
+# Create a PythonREPL instance
+# This provides an environment where Python code can be executed as strings
+python_repl = PythonREPL()
+
+# Create a Tool using the Tool class
+# This wraps the Python REPL functionality as a tool that can be used by agents
+python_calculator = Tool(
+    # The name of the tool - this helps agents identify when to use this tool
+    name="Python Calculator",
+    
+    # The function that will be called when the tool is used
+    # python_repl.run takes a string of Python code and executes it
+    func=python_repl.run,
+    
+    # A description of what the tool does and how to use it
+    # This helps the agent understand when and how to use this tool
+    description="Useful for when you need to perform calculations or execute Python code. Input should be valid Python code."
+)
+
+python_calculator.invoke("a = 3; b = 1; print(a+b)")
+
+@tool
+def search_weather(location: str):
+    """Search for the current weather in the specified location."""
+    # In a real application, this would call a weather API
+    return f"The weather in {location} is currently sunny and 72°F."
+
+# Create a toolkit (collection of tools)
+tools = [python_calculator, search_weather]
+
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain.agents import create_react_agent, AgentExecutor
+from langchain_core.tools import Tool
+
+# Create the ReAct agent prompt template
+# The ReAct prompt needs to instruct the model to follow the thought-action-observation pattern
+prompt_template = """You are an agent who has access to the following tools:
+
+{tools}
+
+The available tools are: {tool_names}
+
+To use a tool, please use the following format:
+```
+Thought: I need to figure out what to do
+Action: tool_name
+Action Input: the input to the tool
+```
+
+After you use a tool, the observation will be provided to you:
+```
+Observation: result of the tool
+```
+
+Then you should continue with the thought-action-observation cycle until you have enough information to respond to the user's request directly.
+When you have the final answer, respond in this format:
+```
+Thought: I know the answer
+Final Answer: the final answer to the original query
+```
+
+Remember, when using the Python Calculator tool, the input must be valid Python code.
+
+Begin!
+
+Question: {input}
+{agent_scratchpad}
+"""
+
+prompt = PromptTemplate.from_template(prompt_template)
+
+# Create the agent
+agent = create_react_agent(
+    llm=llama_llm,
+    tools=tools,
+    prompt=prompt
+)
+
+# Create the agent executor
+agent_executor = AgentExecutor(
+    agent=agent, 
+    tools=tools, 
+    verbose=True,
+    handle_parsing_errors=True
+)
+
+# Ask the agent a question that requires only calculation
+result = agent_executor.invoke({"input": "What is the square root of 256?"})
+print(result["output"])
+
+# Examples of different types of queries to test the agent
+queries = [
+    "What's 345 * 789?",
+    "Calculate the square root of 144",
+    "What's the weather in Miami?",
+    "If it's sunny in Chicago, what would be a good outdoor activity?",
+    "Generate a list of prime numbers below 50 and calculate their sum"
+]
+
+for query in queries:
+    print(f"\n{'='*60}")
+    print(f"QUERY: {query}")
+    print(f"{'='*60}")
+    
+    result = agent_executor.invoke({"input": query})
+    
+    print(f"\nFINAL ANSWER: {result['output']}")
+
+
+# Exercise 7
+# Creating Your First LangChain Agent with Basic Tools
+# In this exercise, you'll build a simple agent that can help users with basic tasks using two custom tools. This exercise is a perfect starting point for understanding how LangChain agents work.
+
+# Instructions:
+
+# Create two simple tools: A calculator and a text formatter.
+# Set up a basic agent that can use these tools.
+# Test the agent with straightforward questions.
+
+
+from langchain_core.tools import Tool
+from langchain.agents import create_react_agent, AgentExecutor
+from langchain_core.prompts import PromptTemplate
+
+# Create a simple calculator tool
+def calculator(expression: str) -> str:
+    """A simple calculator that can add, subtract, multiply, or divide two numbers.
+    Input should be a mathematical expression like '2 + 2' or '15 / 3'."""
+    try:
+        result = eval(expression)
+        return f"Result: {result}"
+    except Exception as e:
+        return f"Error calculating: {str(e)}"
+
+# Create a text formatting tool
+def format_text(text: str) -> str:
+    """Format text to uppercase, lowercase, or title case.
+    Input should be in format: [format_type]: [text]
+    where format_type is uppercase, lowercase, or titlecase.
+    
+    Examples:
+    - uppercase: hello world -> HELLO WORLD
+    - lowercase: HELLO WORLD -> hello world 
+    - titlecase: hello world -> Hello World
+    """
+    try:
+        # Handle the case where the entire string is passed
+        if ":" in text:
+            format_type, content = text.split(":", 1)
+            format_type = format_type.strip().lower()
+            content = content.strip()
+        else:
+            # If no colon, assume they want titlecase
+            return f"Missing format. Example: titlecase: {text} -> {text.title()}"
+            
+        if format_type == "uppercase":
+            return content.upper()
+        elif format_type == "lowercase":
+            return content.lower()
+        elif format_type == "titlecase":
+            return content.title()
+        else:
+            return f"Unknown format {format_type}. Use: uppercase, lowercase, or titlecase"
+            
+    except Exception as e:
+        return f"Error formatting text: {str(e)}"
+
+# Create Tool objects for our functions
+tools = [
+    Tool(
+        name="calculator",
+        func=calculator,
+        description="Useful for performing simple math calculations"
+    ),
+    Tool(
+        name="format_text",
+        func=format_text,
+        description="Useful for formatting text to uppercase, lowercase, or titlecase"
+    )
+]
+
+# Create a simple prompt template
+# Note the added {tool_names} variable which was missing before
+prompt_template = """You are a helpful assistant who can use tools to help with simple tasks.
+You have access to these tools:
+
+{tools}
+
+The available tools are: {tool_names}
+
+Follow this format:
+
+Question: the user's question
+Thought: think about what to do
+Action: the tool to use, should be one of [{tool_names}]
+Action Input: the input to the tool
+Observation: the result from the tool
+Thought: I now know the final answer
+Final Answer: your final answer to the user's question
+
+Question: {input}
+{agent_scratchpad}
+"""
+
+# Create the agent and executor
+prompt = PromptTemplate.from_template(prompt_template)
+agent = create_react_agent(
+    llm=llama_llm,
+    tools=tools,
+    prompt=prompt
+)
+agent_executor = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    verbose=True
+)
+
+# Test with simple questions
+test_questions = [
+    "What is 25 + 63?", # The agent will be able to answer this question
+    "Can you convert 'hello world' to uppercase?", # The agent might be able to answer this question
+                                                    # However, it is not guaranteed due to incorrect input format
+    "Calculate 15 * 7", # The agent will be able to answer this question
+    "titlecase: langchain is awesome", # The agent will be able to answer this question
+]
+
+# Run the tests
+for question in test_questions:
+    print(f"\n===== Testing: {question} =====")
+    result = agent_executor.invoke({"input": question})
+    print(f"Final Answer: {result['output']}")
